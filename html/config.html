@@ -1,0 +1,58 @@
+<section class="settings">
+  <h2>メンテナンス管理プラグイン 設定</h2>
+
+  <div class="kintoneplugin-row">
+    <div class="kintoneplugin-label">動作モードの選択 <span class="kintoneplugin-require">*</span></div>
+    <div class="kintoneplugin-desc">このプラグインをインストールしているアプリの役割を選択してください。</div>
+    <div class="kintoneplugin-input-radio" id="operation-mode-container">
+      <!-- KUC RadioButton will be rendered here -->
+    </div>
+  </div>
+
+  <!-- 対象アプリモードの設定項目 -->
+  <div id="target-app-settings" style="display: none; margin-top: 20px; border-top: 1px solid #e3e7e8; padding-top: 20px;">
+    <h3>対象アプリ設定（ブロックされる側）</h3>
+    
+    <div class="kintoneplugin-row">
+      <div class="kintoneplugin-label">メンテナンス管理アプリのアプリID <span class="kintoneplugin-require">*</span></div>
+      <div class="kintoneplugin-desc">メンテナンス情報を登録するマスターアプリのIDを入力してください。（例：152）</div>
+      <div class="kintoneplugin-input-outer">
+        <input class="kintoneplugin-input-text" type="text" id="maintenance-app-id">
+      </div>
+    </div>
+
+    <div class="kintoneplugin-row">
+      <div class="kintoneplugin-label">デザインテーマの選択</div>
+      <div class="kintoneplugin-desc">メンテナンス画面の表示テーマを選択します。</div>
+      <div id="theme-select-container">
+        <!-- KUC Dropdown will be rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理アプリモードの設定項目 -->
+  <div id="manager-app-settings" style="display: none; margin-top: 20px; border-top: 1px solid #e3e7e8; padding-top: 20px;">
+    <h3>管理アプリ設定（設定を登録する側）</h3>
+    
+    <div class="kintoneplugin-row">
+      <div class="kintoneplugin-label">対象アプリ選択UIを表示するスペースフィールドの要素ID <span class="kintoneplugin-require">*</span></div>
+      <div class="kintoneplugin-desc">「対象アプリ」を選択するチェックボックス群を表示するための、空白のスペースフィールドの要素IDを指定してください。</div>
+      <div class="kintoneplugin-input-outer">
+        <input class="kintoneplugin-input-text" type="text" id="manager-space-id" placeholder="例: app_select_space">
+      </div>
+    </div>
+
+    <div class="kintoneplugin-row">
+      <div class="kintoneplugin-label">対象アプリIDを保存するフィールド（文字列・複数行 または 文字列・1行）のフィールドコード <span class="kintoneplugin-require">*</span></div>
+      <div class="kintoneplugin-desc">選択されたアプリIDを保存するフィールドのフィールドコードを指定してください。</div>
+      <div class="kintoneplugin-input-outer">
+        <input class="kintoneplugin-input-text" type="text" id="manager-save-field" placeholder="例: Target_App_IDs">
+      </div>
+    </div>
+  </div>
+
+  <div class="kintoneplugin-row" style="margin-top: 30px;">
+    <button type="button" id="plugin-submit" class="kintoneplugin-button-dialog-ok">保存</button>
+    <button type="button" id="plugin-cancel" class="kintoneplugin-button-dialog-cancel">キャンセル</button>
+  </div>
+</section>
