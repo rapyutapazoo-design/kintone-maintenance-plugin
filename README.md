@@ -50,3 +50,6 @@ npx @kintone/plugin-packer --ppk <秘密鍵ファイル>.ppk .
 ## 📝 開発者情報
 - **作成者**: hiroki
 - **リポジトリ**: [kintone-maintenance-plugin](https://github.com/rapyutapazoo-design/kintone-maintenance-plugin)
+
+## 📄 ライセンス
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
