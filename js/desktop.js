@@ -26,19 +26,37 @@
         'mobile.app.record.edit.show'
     ];
 
-    kintone.events.on(blockEvents, function (event) {
-        const currentAppId = kintone.app.getId() || kintone.mobile.app.getId();
-        const loginUser = kintone.getLoginUser();
+    let isChecking = false;
+    let isBlocked = false;
 
-        // メンテナンス管理アプリから「有効」のレコードを取得するクエリ
+    // 現在のアプリIDを取得するフォールバック関数（即時実行時はkintoneオブジェクトの初期化前かもしれないため）
+    function getCurrentAppId() {
+        let appId = kintone.app.getId() || kintone.mobile.app.getId();
+        if (appId) return appId;
+        const match = window.location.pathname.match(/\/k\/(?:m\/)?(\d+)/);
+        if (match && match[1]) {
+            return parseInt(match[1], 10);
+        }
+        return null;
+    }
+
+    // メインの判定・ブロック処理（非同期）
+    function checkAndBlockMaintenance() {
+        if (isChecking || isBlocked) return Promise.resolve();
+        isChecking = true;
+
+        const currentAppId = getCurrentAppId();
+        if (!currentAppId) {
+            isChecking = false;
+            return Promise.resolve();
+        }
+
+        const loginUser = kintone.getLoginUser();
         const query = 'Is_Active in ("有効") order by Start_Datetime desc limit 10';
 
         const fetchMaintenanceRecord = function () {
             return new kintone.Promise(function (resolve, reject) {
-                const body = {
-                    app: MAINTENANCE_APP_ID,
-                    query: query
-                };
+                const body = { app: MAINTENANCE_APP_ID, query: query };
                 kintone.api(kintone.api.url('/k/v1/records.json', true), 'GET', body, function (resp) {
                     resolve(resp);
                 }, function (error) {
@@ -48,19 +66,17 @@
             });
         };
 
-        fetchMaintenanceRecord().then(function (resp) {
+        return fetchMaintenanceRecord().then(function (resp) {
             if (!resp || !resp.records || resp.records.length === 0) return Promise.reject('No Setting');
 
             let activeRecord = null;
             const now = new Date().getTime();
 
-            // 期間内で、対象アプリIDに自分が含まれる（または空＝全アプリ対象）レコードを探す
             for (let i = 0; i < resp.records.length; i++) {
                 const rec = resp.records[i];
                 const startStr = rec.Start_Datetime ? rec.Start_Datetime.value : '';
                 const endStr = rec.End_Datetime ? rec.End_Datetime.value : '';
                 
-                // 対象アプリ判定。フィールドコードは "Target_App_IDs" （managerが保存するフィールド名と一致させる）
                 let targetApps = '';
                 if (rec.Target_App_IDs) targetApps = rec.Target_App_IDs.value || '';
                 else if (rec.Target_App) targetApps = rec.Target_App.value || '';
@@ -82,21 +98,17 @@
             if (!activeRecord) {
                 return Promise.reject('Not In Period or Not Target');
             }
-
             return activeRecord;
         }).then(function (record) {
-
             const bypassUsers = record.Bypass_Users && record.Bypass_Users.value ? record.Bypass_Users.value.map(u => u.code) : [];
             const bypassGroups = record.Bypass_Groups && record.Bypass_Groups.value ? record.Bypass_Groups.value.map(g => g.code) : [];
             const bypassOrgs = record.Bypass_Orgs && record.Bypass_Orgs.value ? record.Bypass_Orgs.value.map(o => o.code) : [];
 
-            // バイパス判定: 1. ユーザー指定での許可
             if (bypassUsers.includes(loginUser.code)) {
                 showAdminNotice();
                 return Promise.reject('Allowed By User');
             }
 
-            // バイパス判定: 2. グループ（ロール）
             let groupPromise = kintone.Promise.resolve(false);
             if (bypassGroups.length > 0) {
                 groupPromise = kintone.api(kintone.api.url('/v1/user/groups', true), 'GET', { code: loginUser.code }).then(function (groupResp) {
@@ -105,7 +117,6 @@
                 });
             }
 
-            // バイパス判定: 3. 組織
             let orgPromise = kintone.Promise.resolve(false);
             if (bypassOrgs.length > 0) {
                 orgPromise = kintone.api(kintone.api.url('/v1/user/organizations', true), 'GET', { code: loginUser.code }).then(function (orgResp) {
@@ -115,20 +126,17 @@
             }
 
             return kintone.Promise.all([groupPromise, orgPromise]).then(function(results) {
-                const isAllowedByGroup = results[0];
-                const isAllowedByOrg = results[1];
-
-                if (isAllowedByGroup || isAllowedByOrg) {
+                if (results[0] || results[1]) {
                     showAdminNotice();
                     return Promise.reject('Allowed By Group/Org');
                 }
-
-                return record; // 許可されていないのでブロック処理へ進む
+                return record;
             });
 
         }).then(function (record) {
-
-            // ブロック処理
+            if (isBlocked) return; // 既にブロックされていれば何もしない
+            isBlocked = true;
+            
             const startStr = record.Start_Datetime.value;
             const endStr = record.End_Datetime.value;
 
@@ -162,11 +170,36 @@
             showMaintenanceOverlay(displayPeriod, htmlMessage, selectedTheme);
 
         }).catch(function (err) {
-            if (err !== 'No Setting' && err !== 'Not In Period or Not Target' && err !== 'Allowed By User' && err !== 'Allowed By Group/Org') {
+            const ignoreList = ['No Setting', 'Not In Period or Not Target', 'Allowed By User', 'Allowed By Group/Org'];
+            if (!ignoreList.includes(err)) {
                 console.error('メンテナンス情報の取得・判定中にエラーが発生しました', err);
             }
+        }).finally(function () {
+            isChecking = false;
         });
+    }
+
+    // --- 堅牢性を高める3段構えのトリガー（トリプル・トリガー） ---
+
+    // 【第1トリガー: 即時実行】
+    // イベント発火を待たずに、プラグインファイルが読み込まれた瞬間に判定をスタートする
+    checkAndBlockMaintenance();
+
+    // 【第2トリガー: 従来イベント】
+    // SPA型の画面遷移などで再度イベントが発生した際にも確実に判定する
+    kintone.events.on(blockEvents, function (event) {
+        checkAndBlockMaintenance();
         return event;
+    });
+
+    // 【第3トリガー: エラー検知フェイルセーフ】
+    // 他のJSの構文エラー（ReferenceError等）が原因でkintoneイベントが停止した場合、
+    // このエラーキャッチをトリガーにして強制的にメンテナンス判定を走らせる
+    window.addEventListener('error', function(e) {
+        checkAndBlockMaintenance();
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+        checkAndBlockMaintenance();
     });
 
     // UI関連関数
