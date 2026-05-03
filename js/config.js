@@ -61,12 +61,36 @@
 
     if (newConfig.operationMode === 'target') {
       var appId = document.getElementById('maintenance-app-id').value;
+      var apiToken = document.getElementById('maintenance-api-token').value;
+      
       if (!appId) {
         alert('メンテナンス管理アプリのアプリIDを入力してください。');
         return;
       }
+      
+      // 初回設定時、またはアプリIDを変更した場合はトークン入力必須
+      var needsToken = !config.hasApiToken || (appId !== config.maintenanceAppId);
+      if (needsToken && !apiToken) {
+        alert('APIトークンを入力してください。（アプリIDを変更した場合も再入力が必要です）');
+        return;
+      }
+
       newConfig.maintenanceAppId = appId;
       newConfig.theme = themeDropdown.value;
+      newConfig.hasApiToken = 'true';
+
+      if (apiToken) {
+        // プロキシURLを厳密に生成（GETリクエストではこのURLと完全一致する必要があるため）
+        var proxyQuery = 'Is_Active in ("有効") order by Start_Datetime desc limit 10';
+        var proxyUrl = window.location.origin + '/k/v1/records.json?app=' + appId + '&query=' + encodeURIComponent(proxyQuery);
+        
+        kintone.plugin.app.setProxyConfig(proxyUrl, 'GET', {
+            'X-Cybozu-API-Token': apiToken
+        }, {}, function() {
+            kintone.plugin.app.setConfig(newConfig);
+        });
+        return; // setConfigはコールバック内で実行されるため終了
+      }
     } else {
       var spaceId = document.getElementById('manager-space-id').value;
       var saveField = document.getElementById('manager-save-field').value;

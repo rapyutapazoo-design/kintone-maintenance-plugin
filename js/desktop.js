@@ -56,12 +56,23 @@
 
         const fetchMaintenanceRecord = function () {
             return new kintone.Promise(function (resolve, reject) {
-                const body = { app: MAINTENANCE_APP_ID, query: query };
-                kintone.api(kintone.api.url('/k/v1/records.json', true), 'GET', body, function (resp) {
-                    resolve(resp);
+                const proxyUrl = window.location.origin + '/k/v1/records.json?app=' + MAINTENANCE_APP_ID + '&query=' + encodeURIComponent(query);
+                kintone.plugin.app.proxy(proxyUrl, 'GET', {}, {}, function (body, status, headers) {
+                    if (status >= 200 && status < 300) {
+                        try {
+                            const resp = JSON.parse(body);
+                            resolve(resp);
+                        } catch (e) {
+                            console.error('JSONパースエラー', e);
+                            reject('JSON Parse Error');
+                        }
+                    } else {
+                        console.error('メンテナンス管理アプリへのアクセスに失敗しました', status, body);
+                        reject('API Error');
+                    }
                 }, function (error) {
-                    console.error('メンテナンス管理アプリへのアクセスに失敗しました', error);
-                    reject('API Error');
+                    console.error('プロキシ通信エラー', error);
+                    reject('Proxy Error');
                 });
             });
         };
