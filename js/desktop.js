@@ -57,7 +57,7 @@
         const fetchMaintenanceRecord = function () {
             return new kintone.Promise(function (resolve, reject) {
                 const proxyUrl = window.location.origin + '/k/v1/records.json?app=' + MAINTENANCE_APP_ID + '&query=' + encodeURIComponent(query);
-                kintone.plugin.app.proxy(proxyUrl, 'GET', {}, {}, function (body, status, headers) {
+                kintone.plugin.app.proxy(PLUGIN_ID, proxyUrl, 'GET', {}, {}, function (body, status, headers) {
                     if (status >= 200 && status < 300) {
                         try {
                             const resp = JSON.parse(body);
